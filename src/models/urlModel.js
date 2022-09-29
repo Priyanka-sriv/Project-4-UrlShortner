@@ -2,7 +2,7 @@ const mongoose = require('mongoose')
 
 const urlModel = new mongoose.Schema({
     longUrl: {
-        type: String, required: true, unique: true, trim: true,lowercase:true
+        type: String, required: true, unique: true, trim: true, lowercase: true
     },
     shortUrl: {
         type: String, required: true, trim: true
