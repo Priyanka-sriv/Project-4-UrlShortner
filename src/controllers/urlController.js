@@ -1,14 +1,41 @@
 const urlModel = require("../models/urlModel")
 const shortId = require("shortid");
 const validUrl = require('valid-url');
-
+const redis = require('redis')
+const {promisify} = require('util'); 
+const shortid = require("shortid");
+const { url } = require("inspector");
+const redisClient = redis.createClient(             //syntax
+    18561, //redis port
+    "redis-18561.c212.ap-south-1-1.ec2.cloud.redislabs.com",  //redis db url
+   
+    { no_ready_check: true }
+  );
+  redisClient.auth("iFA13JDh4THujExqFlm0CHSnJpSLHsP9", function (err) {   // in callback function catch the error  redis password
+    if (err) throw err;
+  });
+  
+  redisClient.on("connect", async function () {  //build connection with redis db
+    console.log("Connected to Redis..");
+  });
+  
+  
+  
+  //1. connect to the server
+  //2. use the commands :
+  
+  //Connection setup for redis
+  
+  const SET_ASYNC = promisify(redisClient.SET).bind(redisClient); 
+  const GET_ASYNC = promisify(redisClient.GET).bind(redisClient);
+  
 
 
 const createUrl = async function (req, res) {
     try {
         let longUrl = req.body.longUrl
-        if (Object.keys(longUrl).length == 0) return res.status(400).send({ status: false, message: "please provide url" })
-       
+        if (Object.keys(req.body).length == 0) return res.status(400).send({ status: false, message: "please provide require data" })
+
 
         if (!longUrl) {
             return res.status(400).send({ status: false, message: "longUrl is must be present" });
@@ -16,11 +43,15 @@ const createUrl = async function (req, res) {
         if (!validUrl.isUri(longUrl)) {
             return res.status(400).send({ status: false, message: "please enter valid URL" })
         }
-        //const urlCode = shortid.generate()
-    
-        let checkUrl = await urlModel.findOne({longUrl})
+        let cachedUrl = await GET_ASYNC(longUrl)
+        if(cachedUrl){
+            cachedUrl = JSON.parse(cachedUrl)
+            return res.status(200).send({status:true,message:"this url has already been shortend",data:cachedUrl})
+        }
+
+        let checkUrl = await urlModel.findOne({ longUrl })
         if (checkUrl) {
-            return res.status(400).send({ status: false, message: "URL already exist" })
+            return res.status(200).send({ status: true, message: "this url has already been shortend",data:checkUrl })
         }
         const urlCode = shortId.generate()
         let baseUrl = "http://localhost:3000";
@@ -30,33 +61,49 @@ const createUrl = async function (req, res) {
         req.body.shortUrl = shortUrl;
         req.body.urlCode = urlCode;
 
-      let arsad =  await urlModel.create(req.body)
-        let data ={};
+        let Url = await urlModel.create(req.body)
+        let data = {};
         data.longUrl = longUrl;
         data.shortUrl = shortUrl;
-        data.urlCode =urlCode
-  //data.isSelected
+        data.urlCode = urlCode
+       
 
-           return res.status(200).send({status:true,message:"sucessfully crated", data:data})
-        
-        
+        return res.status(200).send({ status: true, data: data }) 
+
+
     }
     catch (err) {
         res.status(500).send({ status: false, error: err.message })
     }
 }
 
-const getUrl = async function(req,res){
-try{
-let urlCode = req.params.urlCode;
+const getUrl = async function (req, res) {
+    try {
+        let urlCode = req.params.urlCode;
+        if(!shortId.isValid(urlCode)){
+            return res.status(400).send({status:false, message:"enter valid code"})
+        }
+        let cachedUrl = await GET_ASYNC(urlCode)
+        //console.log("cachedUrl")
+        if(cachedUrl){
+            cachedUrl = JSON.parse(cachedUrl)
+            return res.status(307).redirect(cachedUrl.longUrl)
+        }
+        else{
+            let result = await urlModel.findOne({ urlCode }).select({ longUrl: 1 , shortUrl:1  , urlCode:1 , _id:0})
+            if(!result){
+                return res.status(404).send({staus:false,message:"no url exists"})
+            }
+            let longUrl = result.longUrl
+            await SET_ASYNC(longUrl,JSON.stringify(result)) //key
+            await SET_ASYNC(urlCode,JSON.stringify(result)) //key
+            return res.status(307).redirect(longUrl)
+            
+            }
 
-let result = await urlModel.findOne({urlCode}).select({longUrl:1})
-//return res.status(200).send({status:true,message:result.longUrl})
-res.status(302).redirect(result.longUrl)
-
-}catch(err){
-return res.status(500).send({staus:false,error:err.message})
-}
+    } catch (err) {
+        return res.status(500).send({ staus: false, error: err.message })
+    }
 }
 
 module.exports.getUrl = getUrl
