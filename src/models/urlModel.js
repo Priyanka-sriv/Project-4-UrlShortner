@@ -6,8 +6,8 @@ const urlModel = new mongoose.Schema({
         required: true,
     },
     shortUrl: {
-        type: String, 
-        required: true, 
+        type: String,
+        required: true,
         unique: true
     },
     urlCode: {
