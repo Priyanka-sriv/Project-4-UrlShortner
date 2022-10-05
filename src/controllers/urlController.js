@@ -42,7 +42,7 @@ const createUrl = async function (req, res) {
         if (!validUrl.isWebUri(longUrl)) {
             return res.status(400).send({ status: false, message: "please enter valid URL" })
         }
-        let cachedUrl = await GET_ASYNC(longUrl)
+        let cachedUrl = await GET_ASYNC(`${longUrl}`)
         if(cachedUrl){
             cachedUrl = JSON.parse(cachedUrl)
             return res.status(200).send({status:true,message:"this url has already been shortend",data:cachedUrl})
