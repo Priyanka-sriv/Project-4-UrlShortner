@@ -42,7 +42,7 @@ const shortUrl = async function (req, res) {
         if (!validUrl.isWebUri(longUrl)) {
             return res.status(400).send({ status: false, message: "please enter valid URL" })
         }
-        
+       
         let cachedUrl = await GET_ASYNC(`${longUrl}`)
 
         if(cachedUrl){
